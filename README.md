@@ -39,15 +39,14 @@ Rerun the program to play again!
 
 ## Notes
 - Only easy difficulty is available at the moment (9x9, 10mines).
-- "!" denotes that the user selected a mine cell.
+- "!" denotes that the user selected a mine cell to lose the game.
 
 ## Limitations
 This section goes over features that still need to be developed.
 
 - Medium and hard difficulty
-- Auto-restart system
+- Restart system
 - Chording
-- Flagging
 - Undo
 - Timer
 - Moves Tracker

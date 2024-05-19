@@ -1,8 +1,6 @@
 /**
- *
- * DATE: 2024-05-16 - 2024-05-XX
+ * DATE: 2024-05-16 - 2024-05-19
  * PURPOSE: Generates the minesweeper game.
- *
  */
 
 
@@ -40,6 +38,20 @@ class Cell {
         }
 
         ~Cell() {}
+        
+
+
+        /**
+         * NOTE: For DEBUGGING purposes only.
+         * PURPOSE: Prints out the neighbors of a cell.
+         * @return Nothing.
+         */
+        void print_neighbors() {
+            for (int i = 0; i < (int)neighbors.size(); i++) {
+                cout << neighbors[i].hidden_value << " "; 
+            }
+            cout << "\n" << endl;
+        }
 };
 
 
@@ -58,7 +70,7 @@ class Game {
         unsigned int col_num;
         unsigned int mines_count;
         unsigned int flags_count;
-        unsigned int flag_enable; //0 unflag, 1 flag
+        unsigned int flag_enable; // 0 unflag, 1 flag
         string move;
         set<string> track_moves;
         set<pair<int,int>> visited_cells;
@@ -104,11 +116,9 @@ class Game {
 
         /**
          * PURPOSE: Asks and verifies user input of a cell.
-         * @param move The cell to be revealed.
-         * @param moves_list Tracks valid moves.
          * @return True, if valid move. Otherwise, false. 
          */
-        bool request_move(string &move, set<string> &track_moves) {
+        bool request_move() {
             cout << "[SYSTEM]: Please enter a move from below.\n" <<
                 "{<letter><number>}\nflag\nquit/q/exit to terminate\n:";
             cin >> move;
@@ -136,8 +146,6 @@ class Game {
                     "{<letter><number>} to flag/unflag: ";
                 cin >> move;
                 flag_enable = 1;
-
-                return false;
             }
 
             move[0] = tolower(move[0]);
@@ -156,6 +164,7 @@ class Game {
             cout << "[SYSTEM]: Your requested move is either INVALID "
                 << "or has been already CALLED!\n" << endl;
 
+            flag_enable = 0;
             return false;
         }
         
@@ -163,15 +172,9 @@ class Game {
 
         /**
          * PURPOSE: Checks and reveals the contents of a cell.
-         * @param board The playing board.
-         * @param move The selected cell.
-         * @param score The current score.
-         * @param status Win/Lose.
          * @return True, if cell is a mine. Otherwise, false.
          */
-        bool check_cell(set<pair<int,int>> &visited_cells,
-                vector<vector<Cell>> &board, string &move,
-                unsigned int &score, unsigned int &status) {
+        bool check_cell() {
             int x, y;
             x = move[0] - 'a';
             y = move[1] - '1';
@@ -205,7 +208,7 @@ class Game {
 
             if (board[x][y].hidden_value == '*') {
                 if (score > 0) {
-                    board[x][y].default_value = '!';
+                    board[x][y].hidden_value = '!';
                     status = 0;
                     return true;
                 }
@@ -219,7 +222,7 @@ class Game {
             }
 
             if (board[x][y].hidden_value == '0') {
-                traverse_zero_cells(visited_cells, board, x, y);
+                traverse_zero_cells(x, y);
             } else {
                 board[x][y].default_value = board[x][y].hidden_value;
                 ++score;
@@ -231,14 +234,11 @@ class Game {
 
         /**
          * PURPOSE: Traverses through blank spaces.
-         * @param visited_cells The visited cells.
-         * @param board The playing board.
          * @param x The row coordinate of a cell.
          * @param y The column coordinate of a cell.
          * @return Nothing.
          */
-        void traverse_zero_cells(set<pair<int,int>> &visited_cells,
-                vector<vector<Cell>> &board, int x, int y) {
+        void traverse_zero_cells(int x, int y) {
             if (x < 0 || x >= (int)row_num || y < 0 || y >= (int)col_num ||
                     visited_cells.find(make_pair(x,y)) !=
                     visited_cells.end()) { 
@@ -256,14 +256,14 @@ class Game {
             ++score;
             visited_cells.insert(make_pair(x,y));
 
-            traverse_zero_cells(visited_cells, board, x, y-1);
-            traverse_zero_cells(visited_cells, board, x, y+1);
-            traverse_zero_cells(visited_cells, board, x-1, y);
-            traverse_zero_cells(visited_cells, board, x+1, y);
-            traverse_zero_cells(visited_cells, board, x-1, y-1);
-            traverse_zero_cells(visited_cells, board, x-1, y+1);
-            traverse_zero_cells(visited_cells, board, x+1, y-1);
-            traverse_zero_cells(visited_cells, board, x+1, y+1);
+            traverse_zero_cells(x, y-1);
+            traverse_zero_cells(x, y+1);
+            traverse_zero_cells(x-1, y);
+            traverse_zero_cells(x+1, y);
+            traverse_zero_cells(x-1, y-1);
+            traverse_zero_cells(x-1, y+1);
+            traverse_zero_cells(x+1, y-1);
+            traverse_zero_cells(x+1, y+1);
        }
 
 
@@ -287,7 +287,7 @@ class Game {
         /**
          * PURPOSE: Finds and sets numbered cells.
          * @param board The playing board.
-         * @return Nothing
+         * @return Nothing.
          */
         void select_num_cells() {
             int x, y;
@@ -314,26 +314,11 @@ class Game {
 
 
         /**
-         * NOTE: For DEBUGGING purposes only.
-         * PURPOSE: Prints out the neighbors of a cell.
-         * @return Nothing
-         */
-        void print_neighbors(vector<Cell> &neighbors) {
-            for (int i = 0; i < (int)neighbors.size(); i++) {
-                cout << neighbors[i].hidden_value << " "; 
-            }
-            cout << "\n" << endl;
-        }
-
-
-
-        /**
          * PURPOSE: Generates the playing board.
-         * @param board The playing board.
          * @param type (0)Hide or (1)reveal cells.
-         * @return Nothing
+         * @return Nothing.
          */
-        void draw_board(vector<vector<Cell>> &board, int type) {
+        void draw_board(int type) {
             char row_val = 'A';
             cout << "    1   2   3   4   5   6   7   8   9" << endl;
             cout << "  +===+===+===+===+===+===+===+===+===+" << endl;
@@ -405,7 +390,7 @@ class Game {
 
 
 /**
- * PURPOSE: Main function
+ * PURPOSE: Main function.
  * @return 0 = success, 1 = failure
  */
 int main() {
@@ -414,19 +399,16 @@ int main() {
     cout << "[SYSTEM]: LOADING Minesweeper..." << endl;
     cout << "[SYSTEM]: Welcome to Minesweeper!" << endl;
     game.generate_mines();
-    //game.select_num_cells();
 
     while (game.check_score() != true) {
-        // game.draw_board(game.board, 1);
-        game.draw_board(game.board, 0);
-        game.request_move(game.move, game.track_moves);
-        if (game.check_cell(game.visited_cells, game.board, game.move,
-                    game.score, game.status) == true) {
+        // game.draw_board(1);
+        game.draw_board(0);
+        if (game.request_move() && game.check_cell() == true) {;
             break;
         }
     }
 
-    game.draw_board(game.board, 1);
+    game.draw_board(1);
 
     if (game.status == 0) {
         cout << "[SYSTEM]: You have lost..." << endl;
