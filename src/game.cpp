@@ -10,8 +10,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <set>
 #include <stdlib.h>
-#include <time.h>
 using namespace std;
 
 
@@ -31,7 +31,7 @@ class Cell {
         /*
          * PURPOSE: Generates a cell.
          */
-        Cell() : default_value('-'), hidden_value('0') {
+        Cell() : default_value(' '), hidden_value('0') {
             offsets = {{-1,-1}, {-1,0}, {-1,1}, {0,-1}, {0,1}, {1,-1},
                 {1,0}, {1,1}};
         }
@@ -49,10 +49,13 @@ class Cell {
 class Game {
     public:
         unsigned int score;
+        unsigned int status; // 0 = lose, 1 = win
         unsigned int difficulty;
         unsigned int row_num;
         unsigned int col_num;
         unsigned int mines_count;
+        string move;
+        set<string> track_moves;
         string username;
         vector<vector<Cell>> board;
 
@@ -60,7 +63,8 @@ class Game {
          * PURPOSE: Generates the game.
          */
         Game() : score(0), difficulty(0), row_num(0),
-            col_num(0), mines_count(0), username("null"), board() {
+            col_num(0), mines_count(0), move(), username("null"),
+            board (9, vector<Cell>(9)) {
 
             switch(difficulty) {
                 case 1:
@@ -91,6 +95,106 @@ class Game {
 
 
         /**
+         * PURPOSE: Asks and verifies user input of a cell.
+         * @param move The cell to be revealed.
+         * @param moves_list Tracks valid moves.
+         * @return True, if valid move. Otherwise, false. 
+         */
+        bool request_move(string &move, set<string> &track_moves) {
+            if (move == "quit" || move == "q" || move == "exit") {
+                cout << "[SYSTEM]: The game has been shut down." << endl;
+                exit(0);
+            }
+
+            set<string> valid_moves = {
+                "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9",
+                "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9",
+                "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9",
+                "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9",
+                "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9",
+                "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9",
+                "g1", "g2", "g3", "g4", "g5", "g6", "g7", "g8", "g9",
+                "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9",
+                "h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8", "h9",
+                "i1", "i2", "i3", "i4", "i5", "i6", "i7", "i8", "i9",
+            };
+            cout << "[SYSTEM]: Please enter a move in the format " <<
+                "{<letter><number>} or quit/q/exit to terminate: "
+                << endl;
+            cin >> move;
+            move[0] = tolower(move[0]);
+            move[1] = tolower(move[1]);
+
+            if (valid_moves.find(move) != valid_moves.end() &&
+                    track_moves.find(move) == track_moves.end()) {
+                track_moves.insert(move);
+                cout << "[SYSTEM]: Your requested move has been accepted.\n" << endl;
+                return true;
+            }
+
+            cout << "[SYSTEM]: Your requested move is either INVALID " <<
+                "or has been already CALLED!\n" << endl;
+            return false;
+        }
+        
+
+
+        /**
+         * PURPOSE: Checks and reveals the contents of a cell.
+         * @param board The playing board.
+         * @param move The selected cell.
+         * @param score The current score.
+         * @param status Win/Lose.
+         * @return True, if cell is a mine. Otherwise, false.
+         */
+        bool check_cell(vector<vector<Cell>> &board, string &move,
+                unsigned int &score, unsigned int &status) {
+            int x, y;
+            x = move[0] - 'a';
+            y = move[1] - '1';
+
+            board[x][y].default_value = board[x][y].hidden_value;
+            
+            if (board[x][y].hidden_value == '*') {
+                board[x][y].default_value = '!';
+                status = 0;
+                return true;
+            }
+
+            ++score;
+            return false;
+        }
+
+
+
+        /**
+         * PURPOSE: Traverses through blank spaces.
+         * @param board The playing board.
+         * @return Nothing.
+         */
+        void traversal_blank_cells() {
+
+        }
+
+
+
+        /**
+         * PURPOSE: Checks if user as won using score.
+         * @param score The final score.
+         * @return True, if all safe cells were revealed. Otherwise, false.
+         */
+        bool check_score() {
+            if (score == 71) {
+                status = 1;
+                return true;
+            }
+
+            return false;
+        }
+
+
+
+        /**
          * PURPOSE: Finds and sets numbered cells.
          * @param board The playing board.
          * @return Nothing
@@ -108,7 +212,7 @@ class Game {
                             if (x >= 0 && x < (int)board.size() && y >= 0
                                     && y < (int)board[i].size() &&
                                     board[x][y].hidden_value != '*') {
-                                board[x][y].hidden_value++;
+                                ++board[x][y].hidden_value;
                             }
                         }
                     }   
@@ -120,6 +224,7 @@ class Game {
 
 
         /**
+         * NOTE: For DEBUGGING purposes only.
          * PURPOSE: Prints out the neighbors of a cell.
          * @return Nothing
          */
@@ -134,17 +239,29 @@ class Game {
 
         /**
          * PURPOSE: Generates the playing board.
+         * @param board The playing board.
+         * @param type (0)Hide or (1)reveal cells.
          * @return Nothing
          */
-        void draw_board(vector<vector<Cell>> &board) {
-            cout << " +===+===+===+===+===+===+===+===+===+" << endl;
+        void draw_board(vector<vector<Cell>> &board, int type) {
+            char row_val = 'A';
+            cout << "    1   2   3   4   5   6   7   8   9" << endl;
+            cout << "  +===+===+===+===+===+===+===+===+===+" << endl;
             for (int i = 0; i < (int)board.size(); i++) {
+                cout << row_val;
                 for (int j = 0; j < (int)board[i].size(); j++) {
-                    cout << " | " << board[i][j].hidden_value; 
+                    if (type == 0) {
+                        cout << " | " << board[i][j].default_value;
+                    } else {
+                        cout << " | " << board[i][j].hidden_value;
+                    }   
                 }
                 cout << " |" << endl;
-                cout << " +===+===+===+===+===+===+===+===+===+" << endl;
+                cout << "  +===+===+===+===+===+===+===+===+===+" << endl;
+                ++row_val;
             }
+            cout << "\n                                           " << 
+                "SCORE: " << score << "\n\n" << endl;
         }
         
 
@@ -163,10 +280,10 @@ class Game {
                 col_sel = rand() % (col_num - 1);
                 board[row_sel][col_sel].hidden_value = '*';
                 
-                cout << "A mine has been set at (" << row_sel << ","
-                    << col_sel << ")." << endl;
+                //cout << "A mine has been set at (" << row_sel << ","
+                  //  << col_sel << ")." << endl;
             }
-            cout << "\n" << endl;
+            cout << "\n\n" << endl;
         }
 };
 
@@ -177,21 +294,30 @@ class Game {
  * @return 0 = success, 1 = failure
  */
 int main() {
-    vector<vector<char>> test = {{'1','2','3'}, {'4','5','6'}, {'7','8','9'}};
-    Game test_game;
-//  test_game.board = test;
-//  test_game.draw_board(test);
+    Game game;
+    cout << "[SYSTEM]: LOADING Minesweeper..." << endl;
+    cout << "[SYSTEM]: Welcome to Minesweeper!" << endl;
+    game.generate_mines();
+    game.select_num_cells(game.board);
 
-    vector<vector<Cell>> test_two(9, vector<Cell>(9));
-    test_game.board = test_two;
-    test_game.draw_board(test_game.board);
-    test_game.generate_mines();
-    test_game.draw_board(test_game.board);
-    test_game.select_num_cells(test_game.board);
-//    test_game.set_numbered_cells(test_game.board);
-//    test_game.print_neighbors(test_game.board[1][1].neighbors);
-    test_game.draw_board(test_game.board);
-    cout << "Success" << endl;
+    while (game.check_score() != true) {
+        game.draw_board(game.board, 1);
+        game.draw_board(game.board, 0);
+        game.request_move(game.move, game.track_moves);
+        if (game.check_cell(game.board, game.move, game.score, game.status) == true) {
+            break;
+        }
+    }
 
+    game.draw_board(game.board, 0);
+
+    if (game.status == 0) {
+        cout << "[SYSTEM]: You have lost..." << endl;
+    } else {
+        cout << "[SYSTEM]: You have won!" << endl;
+    }
+
+    cout << "[SYSTEM]: This program has ended.\n" << 
+        "[SYSTEM]: Please recompile to play again!" << endl;
     return 0;
 }
