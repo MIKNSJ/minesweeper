@@ -1,10 +1,12 @@
 # minesweeper
 
 ## Overview
-This is a classic Minesweeper game. Refer to Minesweeper [here](https://en.wikipedia.org/wiki/Minesweeper_(video_game))
+This is a classic Minesweeper game implemented for C++ playable inside a terminal. Refer to Minesweeper [here](https://en.wikipedia.org/wiki/Minesweeper_(video_game)).
 
 ## Screenshots
-TBD
+![ms-demo-1-img](screenshots/ms-demo-1-update.png)
+
+![ms-demo-2-img](screenshots/ms-demo-2-update.png)
 
 ## Contents
 This section goes over the contents in this directory.
@@ -35,6 +37,10 @@ Type: ```q```, ```quit```, or ```exit``` to quit the game.
 
 Type: ```{<letter><number>}``` to enter a move (cell coordinates).
 
+Type: ```flag``` to flag/unflag cells.
+
+*You have to type and execute the command ```flag``` first, then the cell coordinates to flag/unflag properly.*
+
 Rerun the program to play again!
 
 ## Notes
@@ -46,6 +52,7 @@ This section goes over features that still need to be developed.
 
 - Medium and hard difficulty
 - Restart system
+- Multi-line command processing ```ex: flag a1```
 - Chording
 - Undo
 - Timer
@@ -60,4 +67,4 @@ This section goes over the tool(s) used to make this program.
 ## Sources
 This section goes over external information used to make this program.
 
-- [Traversing through neighbors](https://stackoverflow.com/questions/56485717/need-algorithmic-help-in-minesweeper-regarding-revealing-adjacent-tiles)
+- Traversing through neighbors [Link](https://stackoverflow.com/questions/56485717/need-algorithmic-help-in-minesweeper-regarding-revealing-adjacent-tiles)
