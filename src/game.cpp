@@ -10,8 +10,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <utility>
 #include <set>
 #include <stdlib.h>
+#include <time.h>
 using namespace std;
 
 
@@ -23,6 +25,7 @@ class Cell {
     public:
         char default_value;
         char hidden_value;
+        unsigned int flagged; // 0 if not flagged, 1 otherwise.
         vector<Cell> neighbors;
         vector<vector<int>> offsets;
 
@@ -31,7 +34,7 @@ class Cell {
         /*
          * PURPOSE: Generates a cell.
          */
-        Cell() : default_value(' '), hidden_value('0') {
+        Cell() : default_value(' '), hidden_value('0'), flagged(0) {
             offsets = {{-1,-1}, {-1,0}, {-1,1}, {0,-1}, {0,1}, {1,-1},
                 {1,0}, {1,1}};
         }
@@ -54,17 +57,22 @@ class Game {
         unsigned int row_num;
         unsigned int col_num;
         unsigned int mines_count;
+        unsigned int flags_count;
+        unsigned int flag_enable; //0 unflag, 1 flag
         string move;
         set<string> track_moves;
+        set<pair<int,int>> visited_cells;
         string username;
         vector<vector<Cell>> board;
+
+
 
         /**
          * PURPOSE: Generates the game.
          */
         Game() : score(0), difficulty(0), row_num(0),
-            col_num(0), mines_count(0), move(), username("null"),
-            board (9, vector<Cell>(9)) {
+            col_num(0), mines_count(0), flags_count(10), flag_enable(-1),
+            move(), username("null"), board(9, vector<Cell>(9)) {
 
             switch(difficulty) {
                 case 1:
@@ -101,10 +109,9 @@ class Game {
          * @return True, if valid move. Otherwise, false. 
          */
         bool request_move(string &move, set<string> &track_moves) {
-            if (move == "quit" || move == "q" || move == "exit") {
-                cout << "[SYSTEM]: The game has been shut down." << endl;
-                exit(0);
-            }
+            cout << "[SYSTEM]: Please enter a move from below.\n" <<
+                "{<letter><number>}\nflag\nquit/q/exit to terminate\n:";
+            cin >> move;
 
             set<string> valid_moves = {
                 "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9",
@@ -118,22 +125,37 @@ class Game {
                 "h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8", "h9",
                 "i1", "i2", "i3", "i4", "i5", "i6", "i7", "i8", "i9",
             };
-            cout << "[SYSTEM]: Please enter a move in the format " <<
-                "{<letter><number>} or quit/q/exit to terminate: "
-                << endl;
-            cin >> move;
+
+            if (move == "quit" || move == "q" || move == "exit") {
+                cout << "[SYSTEM]: The game has been shut down." << endl;
+                exit(0);
+            }
+
+            if (move == "flag") {
+                cout << "[SYSTEM]: Enter a cell coordinate " <<
+                    "{<letter><number>} to flag/unflag: ";
+                cin >> move;
+                flag_enable = 1;
+
+                return false;
+            }
+
             move[0] = tolower(move[0]);
             move[1] = tolower(move[1]);
 
             if (valid_moves.find(move) != valid_moves.end() &&
                     track_moves.find(move) == track_moves.end()) {
-                track_moves.insert(move);
-                cout << "[SYSTEM]: Your requested move has been accepted.\n" << endl;
+                if (flag_enable == 0) {
+                    track_moves.insert(move);
+                }
+                cout <<
+                    "[SYSTEM]: Your requested move has been accepted.\n" <<
+                    endl;
                 return true;
             }
+            cout << "[SYSTEM]: Your requested move is either INVALID "
+                << "or has been already CALLED!\n" << endl;
 
-            cout << "[SYSTEM]: Your requested move is either INVALID " <<
-                "or has been already CALLED!\n" << endl;
             return false;
         }
         
@@ -147,21 +169,61 @@ class Game {
          * @param status Win/Lose.
          * @return True, if cell is a mine. Otherwise, false.
          */
-        bool check_cell(vector<vector<Cell>> &board, string &move,
+        bool check_cell(set<pair<int,int>> &visited_cells,
+                vector<vector<Cell>> &board, string &move,
                 unsigned int &score, unsigned int &status) {
             int x, y;
             x = move[0] - 'a';
             y = move[1] - '1';
 
-            board[x][y].default_value = board[x][y].hidden_value;
-            
-            if (board[x][y].hidden_value == '*') {
-                board[x][y].default_value = '!';
-                status = 0;
-                return true;
+            if (flag_enable == 1 && flags_count != 0 &&
+                    board[x][y].flagged == 0 &&
+                    board[x][y].default_value == ' ') {
+                cout << "[SYSTEM]: This cell is now flagged.\n" << endl;
+                board[x][y].default_value = '>';
+                board[x][y].flagged = 1;
+                flag_enable = 0;
+                --flags_count;
+                return false;
+            } 
+
+            if (flag_enable == 1 && board[x][y].flagged == 1 &&
+                    board[x][y].default_value == '>') {
+                board[x][y].default_value = ' ';
+                board[x][y].flagged = 0;
+                flag_enable = 0;
+                ++flags_count;
+                cout << "[SYSTEM]: This cell is now unflagged.\n" << endl;
+                return false;
             }
 
-            ++score;
+            if (flag_enable == 1 && flags_count == 0) {
+                cout << "[SYSTEM]: No flags remaining. " << 
+                    "Please unflag(s) cell(s).\n" << endl;
+                return false;
+            }
+
+            if (board[x][y].hidden_value == '*') {
+                if (score > 0) {
+                    board[x][y].default_value = '!';
+                    status = 0;
+                    return true;
+                }
+
+                board[x][y].hidden_value = '0';
+                remap_first_mine_cell();
+            }
+
+            if (score == 0) {
+                select_num_cells();
+            }
+
+            if (board[x][y].hidden_value == '0') {
+                traverse_zero_cells(visited_cells, board, x, y);
+            } else {
+                board[x][y].default_value = board[x][y].hidden_value;
+                ++score;
+            }
             return false;
         }
 
@@ -169,12 +231,40 @@ class Game {
 
         /**
          * PURPOSE: Traverses through blank spaces.
+         * @param visited_cells The visited cells.
          * @param board The playing board.
+         * @param x The row coordinate of a cell.
+         * @param y The column coordinate of a cell.
          * @return Nothing.
          */
-        void traversal_blank_cells() {
+        void traverse_zero_cells(set<pair<int,int>> &visited_cells,
+                vector<vector<Cell>> &board, int x, int y) {
+            if (x < 0 || x >= (int)row_num || y < 0 || y >= (int)col_num ||
+                    visited_cells.find(make_pair(x,y)) !=
+                    visited_cells.end()) { 
+                return;
+            }
 
-        }
+            if (board[x][y].hidden_value != '0') {
+                board[x][y].default_value = board[x][y].hidden_value;
+                ++score;
+                visited_cells.insert(make_pair(x,y));
+                return;
+            }
+
+            board[x][y].default_value = board[x][y].hidden_value;
+            ++score;
+            visited_cells.insert(make_pair(x,y));
+
+            traverse_zero_cells(visited_cells, board, x, y-1);
+            traverse_zero_cells(visited_cells, board, x, y+1);
+            traverse_zero_cells(visited_cells, board, x-1, y);
+            traverse_zero_cells(visited_cells, board, x+1, y);
+            traverse_zero_cells(visited_cells, board, x-1, y-1);
+            traverse_zero_cells(visited_cells, board, x-1, y+1);
+            traverse_zero_cells(visited_cells, board, x+1, y-1);
+            traverse_zero_cells(visited_cells, board, x+1, y+1);
+       }
 
 
 
@@ -199,7 +289,7 @@ class Game {
          * @param board The playing board.
          * @return Nothing
          */
-        void select_num_cells(vector<vector<Cell>> &board) {
+        void select_num_cells() {
             int x, y;
             for (int i = 0; i < (int)board.size(); i++) {
                 for (int j = 0; j < (int)board[i].size(); j++) {
@@ -261,6 +351,8 @@ class Game {
                 ++row_val;
             }
             cout << "\n                                           " << 
+                "FLAGS REMAINING: " << flags_count << endl;
+            cout << "\n                                           " << 
                 "SCORE: " << score << "\n\n" << endl;
         }
         
@@ -269,7 +361,7 @@ class Game {
         /**
          * PURPOSE: Generates mines on the board.
          * @param board The playing board.
-         * @return Nothing
+         * @return Nothing.
          */
         void generate_mines() {
             unsigned int row_sel;
@@ -280,10 +372,33 @@ class Game {
                 col_sel = rand() % (col_num - 1);
                 board[row_sel][col_sel].hidden_value = '*';
                 
-                //cout << "A mine has been set at (" << row_sel << ","
-                  //  << col_sel << ")." << endl;
+                //cout << "[SYSTEM]: A mine has been set at ("
+                    //<< row_sel << "," << col_sel << ")." << endl;
             }
             cout << "\n\n" << endl;
+        }
+
+
+
+        /**
+         * PURPOSE: Remap first mine cell if chosen.
+         * @return Nothing.
+         */
+        void remap_first_mine_cell() {
+            bool found = false;
+            int x,y;
+            while (found == false) {
+                x = rand() % (row_num - 1);
+                y = rand() % (col_num - 1);
+                if (board[x][y].hidden_value != '*') {
+                    board[x][y].hidden_value = '*';
+                    found = true;
+                    //cout << 
+                        //"[SYSTEM]: The selected mine has been remapped to: "
+                        //<< x << "," << y << ".\n" << endl;
+                    return;
+                }
+            }
         }
 };
 
@@ -295,21 +410,23 @@ class Game {
  */
 int main() {
     Game game;
+    srand(time(NULL));
     cout << "[SYSTEM]: LOADING Minesweeper..." << endl;
     cout << "[SYSTEM]: Welcome to Minesweeper!" << endl;
     game.generate_mines();
-    game.select_num_cells(game.board);
+    //game.select_num_cells();
 
     while (game.check_score() != true) {
-        game.draw_board(game.board, 1);
+        // game.draw_board(game.board, 1);
         game.draw_board(game.board, 0);
         game.request_move(game.move, game.track_moves);
-        if (game.check_cell(game.board, game.move, game.score, game.status) == true) {
+        if (game.check_cell(game.visited_cells, game.board, game.move,
+                    game.score, game.status) == true) {
             break;
         }
     }
 
-    game.draw_board(game.board, 0);
+    game.draw_board(game.board, 1);
 
     if (game.status == 0) {
         cout << "[SYSTEM]: You have lost..." << endl;
@@ -318,6 +435,6 @@ int main() {
     }
 
     cout << "[SYSTEM]: This program has ended.\n" << 
-        "[SYSTEM]: Please recompile to play again!" << endl;
+        "[SYSTEM]: Please rerun to play again!" << endl;
     return 0;
 }
